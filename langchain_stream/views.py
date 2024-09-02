@@ -48,10 +48,10 @@ chatbotmemory = {}
 rag_chain_store = {}
 previous_uploaded_files_counter = 0
 
-# def get_session_history(session_id: str) -> BaseChatMessageHistory:
-#     if session_id not in chatbotmemory:
-#         chatbotmemory[session_id] = ChatMessageHistory()
-#     return chatbotmemory[session_id]    
+def get_session_history(session_id: str) -> BaseChatMessageHistory:
+    if session_id not in chatbotmemory:
+        chatbotmemory[session_id] = ChatMessageHistory()
+    return chatbotmemory[session_id]    
 
 # llm = ChatGroq(model="llama-3.1-70b-versatile")
 
@@ -83,6 +83,8 @@ previous_uploaded_files_counter = 0
 class ChatConsumer(AsyncWebsocketConsumer):
     
     async def connect(self):
+        self.run_id=0
+        self.chat_history=[]
         self.previous_file_count = 0
         self.conversational_rag_chain = None
         await self.accept()
@@ -118,12 +120,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
         else:
             # Handle message from the client
             message = text_data_json['message']
-            print(message)
             conversation = await self.get_conversation(self.conversation_id)
-
+            # self.runnable_with_history = RunnableWithMessageHistory(
+            #     self.conversational_rag_chain,
+            #     get_session_history,
+            # )
             # Save the message to the database asynchronously
             await self.save_message(conversation, self.scope["user"].username, message, is_user=True, is_ai=False)
-            # chat_history.add_message({"role": "user", "content": message})
+            # self.chat_history=[]
             print('MESSAGE SAVED')
             # Prepare input for the chatbot
             session_config = {
@@ -132,16 +136,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 # 'name': conversation.title           # Use the conversation title as the name
                 }
             }
-            self.chat_history = [
-                                ("user", message),
-                                ("ai", 'I am here to analyze documents'),
-                            ]
+            
             # Send the message back to the WebSocket (only to this connection)
             await self.send(text_data=json.dumps({
                 'message': message,
                 'sender': self.scope["user"].username
             }))
             print('MESSAGE SENT')
+            
             # Send the assistant's response
             if not self.conversational_rag_chain:
                 await self.send(text_data=json.dumps({
@@ -154,34 +156,50 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 try:
                     print('trying to send message to llm')
                     # Stream the response
+                    self.run_id+=1
                     async for event in self.conversational_rag_chain.astream_events(
                             {
                                 'input':message,
                                 "chat_history": self.chat_history,
                             }, 
                             config=session_config, version="v1"):
-                        if (
+                        if event["event"] == "on_chat_model_start":
+                            
+                            print(self.run_id)
+                            await self.send(text_data=json.dumps({
+                            'run_id': self.run_id,
+                            'sender': 'Assistant',
+                            'event': 'on_chat_model_start',
+
+                            }))
+                            
+                        elif (
                                     event["event"] == "on_chat_model_stream"
                                 ):  
                             ai_message_chunk = event["data"]["chunk"]
-                            print(f"{ai_message_chunk.content}", end="")
+                            # print(f"{ai_message_chunk.content}", end="")
                             ai_message += event['data']['chunk'].content  # Append each chunk to ai_message
-                                # print(ai_message)
+                            #print(event['data']['chunk'].id)
                                 # Send the chunk to the WebSocket with proper structure
                             await self.send(text_data=json.dumps({
                                 'message': event['data']['chunk'].content,
                                 'sender': 'Assistant',
                                 'event': 'on_chat_model_stream',
-                                'run_id': 2
+                                'run_id': self.run_id
 
                             }))
-                        
+
+                    
                             # print(json.dumps(chunk['data']['chunk'].content))
                     # After the full response is accumulated, save the AI message to the database
                     if ai_message:
                         await self.save_message(conversation, "Assistant", ai_message, is_user=False, is_ai=True)
-                        # chat_history.add_message({"role": "assistant", "content": ai_message})
-
+                        
+                        self.chat_history.extend([
+                                HumanMessage(content=message),
+                                AIMessage(content=ai_message),
+                            ])
+                        print(self.chat_history)
                         # Send the full AI message to the WebSocket
                         await self.send(text_data=json.dumps({
                                 'message': ai_message,
@@ -356,9 +374,7 @@ def create_rag_chain(conversation_id):
     contextualize_q_system_prompt = (
         "Given a chat history and the latest user question "
         "which might reference context in the chat history, "
-        "formulate a standalone question which can be understood "
-        "without the chat history. Do NOT answer the question, "
-        "just reformulate it if needed and otherwise return it as is."
+        "answer the questions"
     )
     contextualize_q_prompt = ChatPromptTemplate.from_messages(
         [
@@ -369,19 +385,21 @@ def create_rag_chain(conversation_id):
     )
     retriever = process_files_for_conversation(conversation_id)
     print('retriever created')
-    contextualize_q_llm = llm.with_config(tags=["contextualize_q_llm"])
+    
     history_aware_retriever = create_history_aware_retriever(
-        contextualize_q_llm, retriever, contextualize_q_prompt
+        llm, retriever, contextualize_q_prompt
     )
     ### Contextualize question ###
 
 
     system_prompt = '''
+                    Given a chat history
                     You are an assistant for question-answering tasks. 
                     Use the following pieces of retrieved context to answer 
                     the question. If you don't know the answer, say that you 
                     don't know.
                     {context}
+
     '''
     # prompt = ChatPromptTemplate.from_messages(
     #     [
@@ -401,20 +419,19 @@ def create_rag_chain(conversation_id):
 
     qa_chain = create_stuff_documents_chain(llm, prompt)
     print('qa created')
-    # rag_chain = create_retrieval_chain(history_aware_retriever, qa_chain)
-    rag_chain = create_retrieval_chain(retriever, qa_chain)
+    rag_chain = create_retrieval_chain(history_aware_retriever, qa_chain)
+    # rag_chain = create_retrieval_chain(retriever, qa_chain)
     print('rag_chain created')
     conversational_rag_chain = RunnableWithMessageHistory(
         rag_chain,
         get_session_history,
-        input_messages_key="message",
-        history_messages_key="chat_history",
-        output_messages_key="answer",
+        # input_messages_key="message",
+        # history_messages_key="chat_history",
+        # output_messages_key="answer",
     )
     # print('conversational_rag_chain created')
     rag_chain_store[conversation_id] = rag_chain
-    print(rag_chain_store)
-    print(rag_chain)
+
 
     return rag_chain
 
