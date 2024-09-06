@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-4 pt-5 pt-md-0">
+        </div>
+    </div>
+</div>
+<div class="content-wrapper">
+<div class="site-section">
+    {% include 'sidebar.html' %}
+    <div class="container content">
+        <div class="row justify-content-center">
+            <div class="col-md-7">
+                <h2 class="h3 mb-3 text-black">Data Science</h2>
+            </div>
+            <div class="col-md-7" class="image-container">
+                <img src="{% static 'images/sp3D.jpg' %}" alt="Data Science" class="img-fluid mt-4">
+            </div>
+            
+            <div class="col-md-9">
+                <h2 class="h3 mb-3 text-black"></h2>
+                <h5 class="h5 mb-3 text-black">
+                    The selection of appropriate data and its proper preparation are crucial for 
+                    the effectiveness of a machine learning model. Challenges in machine learning, 
+                    such as overfitting, underfitting, and insufficient or inadequate data, present 
+                    significant issues that can affect the accuracy and reliability of models. 
+                    For a model to effectively learn patterns and relationships, 
+                    it requires a large amount of high-quality data. If the data is insufficient, 
+                    incomplete, or improperly prepared, the quality of the model will be limited. 
+                    A lack of diversity in the data can also lead to incorrect conclusions
+                     and an incomplete understanding of real-world relationships, 
+                     which negatively impacts the model's performance. 
+                     Addressing these challenges requires a well-thought-out model architecture, 
+                     proper hyperparameter optimization, and careful preparation and enrichment of the dataset. 
+                     Techniques such as regularization, cross-validation, and data augmentation can help mitigate 
+                     overfitting and underfitting, improving model performance and enhancing its generalization. 
+                     I invite you to explore the examples presented.
+                </h5>
+            </div>
+            
+        </div>
+    </div>
+</div>
+</div>
+
+
+{% endblock content %}

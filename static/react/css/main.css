@@ -172,6 +172,9 @@ button:focus, button:focus-visible {
     flex-grow: 1; /* Ensure link takes full width */
     margin-right: 10px;
     transition: background-color 0.3s ease;
+    white-space: nowrap;  /* Prevent wrapping */
+    overflow: hidden;     /* Hide overflow */
+    text-overflow: ellipsis;  /* Display ellipsis for overflow */
 }
 
 .sidebar a:hover, .sidebar a.active {
@@ -262,4 +265,61 @@ button:focus, button:focus-visible {
         max-height: none; /* Ensure the sidebar is always visible on larger screens */
         transform: translateY(0); /* No transformation needed on large screens */
     }
+}
+
+
+/* Add basic CSS to style the loading popup */
+.loading-popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 20px;
+    border-radius: 8px;
+    z-index: 1000;
+    text-align: center;
+}
+
+.alert-box {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    width: 80%;
+    max-width: 600px;
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.alert-message {
+    padding: 10px;
+    margin: 5px 0;
+    list-style: none;
+    font-size: 16px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.alert-message.success {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.alert-message.error {
+    background-color: #f44336;
+    color: white;
+}
+
+.alert-message.info {
+    background-color: #2196F3;
+    color: white;
+}
+
+.alert-message.warning {
+    background-color: #ff9800;
+    color: white;
 }

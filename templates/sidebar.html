@@ -1,0 +1,54 @@
+<div id="sidebar" class="sidebar">
+    <div class="sidebar-content">
+        <h3> Supervised learning - classification</h3>
+        <ul>
+            <li><a href="{% url 'ml:data_preparation' %}">Data preparation and exploration</a></li>
+            <!-- <li><a href="{% url 'ml:notebook-svc' %}">Support Vector Classifier (SVC)</a></li> -->
+            <li><a href="{% url 'ml:bayess' %}">GaussianNaiveBayes</a></li>
+            <li><a href="{% url 'ml:adaboost' %}">AdaBoostClassifier</a></li>
+            <li><a href="{% url 'ml:decision-tree' %}">Decision Tree Classifier</a></li>
+            <li><a href="{% url 'ml:random-forest' %}">Random Forest Classifier</a></li>
+            <li><a href="{% url 'ml:kneighbours' %}">K-Nearest Neighbors (KNN)</a></li>
+            <li><a href="{% url 'ml:summary' %}">Summary</a></li>
+        </ul>
+
+
+        <h3>Supervised learning - regression</h3>
+        <ul>
+            <li><a href="{% url 'ml:prep-reg' %}">Data preparation and exploration</a></li>
+            <li><a href="{% url 'ml:lr' %}">Linear Regression</a></li>
+            <li><a href="{% url 'ml:grid' %}">Grid Search</a></li>
+            <li><a href="{% url 'ml:lasso' %}">Lasso</a></li>
+            <li><a href="{% url 'ml:ridge' %}">Ridge</a></li>
+            <li><a href="{% url 'ml:ada-reg' %}">AdaBoost, Dec.Tree, Rand.For., KN</a></li>
+            <li><a href="{% url 'ml:summary-reg' %}">Summary</a></li>
+        </ul>
+
+        <h3>Unsupervised learning</h3>
+        <ul>
+            <li><a href="#">KMeans, Agglo. Clustering, DBScan</a></li>
+            <li><a href="#">PCA</a></li>
+            <li><a href="#">TSNE</a></li>
+            <li><a href="#">APRIORI</a></li>
+            <li><a href="#">ISOLATION FOREST</a></li>
+            <li><a href="#">LOCAL OUTLIER FACTOR</a></li>
+        </ul>
+
+        <h3>Convolutional Neural Networks (CNNs)</h3>
+        <ul>
+            <li><a href="#">Data preparation and exploration</a></li>
+            <li><a href="#">Data augmentation</a></li>
+            <li><a href="#">Model Architecture</a></li>
+            <li><a href="#">Evaluation</a></li>
+            <li><a href="#">Summary</a></li>
+        </ul>
+        <h3>Generative Adversarial Networks (GANs)</h3>
+        <ul>
+            <li><a href="#">Hyperparameters and parameters</a></li>
+            <li><a href="#">Generator model</a></li>
+            <li><a href="#">Gradient Penalty Calculation</a></li>
+            <li><a href="#">Training</a></li>
+            <li><a href="#">Summary</a></li>
+        </ul>
+    </div>
+</div>

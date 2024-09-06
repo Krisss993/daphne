@@ -18,6 +18,23 @@ ALLOWED_HOSTS = []
 
 CORS_ALLOW_ALL_ORIGINS = True
 
+AUTHENTICATION_BACKENDS = [
+    # Needed to login by username in Django admin, regardless of `allauth`
+    'django.contrib.auth.backends.ModelBackend',
+
+    # `allauth` specific authentication methods, such as login by email
+    'allauth.account.auth_backends.AuthenticationBackend',
+]
+
+
+ACCOUNT_AUTHENTICATION_METHOD = 'email'
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_EMAIL_VERIFICATION = 'optional'
+LOGIN_REDIRECT_URL = '/'
+SITE_ID = 1
+CRISPY_TEMPLATE_PACK = 'bootstrap4'
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -30,9 +47,19 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'langchain_stream',
+    'langchain_chat',
+    'django.contrib.sites',
     'allauth',
     'allauth.account',
+    'allauth.socialaccount',
+    'staff',
+    'core',
+    'crispy_forms',
+    'crispy_bootstrap4',
+    'cart',
+    'ml',
     'corsheaders',
+
 
 ]
 
@@ -48,13 +75,6 @@ MIDDLEWARE = [
     'allauth.account.middleware.AccountMiddleware',
 ]
 
-AUTHENTICATION_BACKENDS = [
-    # Needed to login by username in Django admin, regardless of `allauth`
-    'django.contrib.auth.backends.ModelBackend',
-
-    # `allauth` specific authentication methods, such as login by email
-    'allauth.account.auth_backends.AuthenticationBackend',
-]
 
 ROOT_URLCONF = 'Django_React_Langchain_Stream.urls'
 
@@ -118,6 +138,7 @@ USE_I18N = True
 
 USE_TZ = True
 
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
@@ -143,3 +164,35 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = '/accounts/login/'
 
 
+if DEBUG is False:
+   SESSION_COOKIE_SECURE = True
+   SECURE_BROWSER_XSS_FILTER = True
+   SECURE_CONTENT_TYPE_NOSNIFF = True
+   SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+   SECURE_HSTS_SECONDS = 31536000
+   SECURE_REDIRECT_EXEMPT = []
+   SECURE_SSL_REDIRECT = True
+   SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDER_PROTO', 'https')
+
+   ALLOWED_HOSTS = ['www.domain.com']
+   EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+
+   DATABASES = {
+       'default': {
+           'ENGINE': 'django.db.backends.postgresql_psycopg2',
+           'NAME': '',
+           'USER': '',
+           'PASSWORD': '',
+           'HOST': '',
+           'PORT': '',
+   }
+   }
+
+CRISPY_TEMPLATE_PACK = 'bootstrap4'
+
+# DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL')
+# NOTIFY_EMAIL = env('NOTIFY_EMAIL')
+
+# PAYPAL_CLIENT_ID = env('PAYPAL_SANDBOX_CLIENT_ID')
+# PAYPAL_SECRET_KEY = env('PAYPAL_SANDBOX_SECRET_KEY')
+# SECURE_CROSS_ORIGIN_OPENER_POLICY='same-origin-allow-popups'

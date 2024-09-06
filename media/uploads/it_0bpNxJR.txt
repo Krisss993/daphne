@@ -1,0 +1,4 @@
+Google Analytics Universal oraz Google Analytics 4
+MLFlow
+whisper ai
+tableau

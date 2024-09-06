@@ -1,0 +1,2 @@
+{% load i18n %}
+{% blocktrans %}Nie można potwierdzić adresu {{email}} ponieważ jest już używany.{% endblocktrans %}

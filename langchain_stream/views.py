@@ -10,7 +10,6 @@ from asgiref.sync import sync_to_async
 
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from .models import Conversation, ChatMessage,UploadedFile
 from django.http import JsonResponse, HttpResponseBadRequest
 from django.http import FileResponse
 from langchain_community.document_loaders import TextLoader
@@ -35,7 +34,10 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_community.vectorstores import Qdrant
 from langchain.chains.combine_documents import create_stuff_documents_chain
 load_dotenv('.env')
-
+from langchain.chains import create_history_aware_retriever
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from langchain_stream.models import Conversation, ChatMessage, UploadedFile
 from channels.generic.websocket import AsyncWebsocketConsumer
 from asgiref.sync import sync_to_async
 import json
@@ -44,41 +46,23 @@ from langchain_community.vectorstores import Qdrant
 from langchain.embeddings import HuggingFaceEmbeddings
 from django.conf import settings
 
-chatbotmemory = {}
+
 rag_chain_store = {}
 previous_uploaded_files_counter = 0
 
-def get_session_history(session_id: str) -> BaseChatMessageHistory:
-    if session_id not in chatbotmemory:
-        chatbotmemory[session_id] = ChatMessageHistory()
-    return chatbotmemory[session_id]    
 
-# llm = ChatGroq(model="llama-3.1-70b-versatile")
+@sync_to_async
+def load_chat_history_from_db(conversation_id: int):
+    """Load messages from the database into ChatMessageHistory for the given conversation."""
+    history = []
+    messages = ChatMessage.objects.filter(conversation_id=conversation_id).order_by('timestamp')
+    for message in messages:
+        if message.is_user_message:
+            history.extend([HumanMessage(content=message.message)])
+        elif message.is_ai_message:
+            history.extend([AIMessage(content=message.message)])
+    return history
 
-# system_prompt = '''
-#                     You are an assistant for question-answering tasks. 
-#                     Use the following pieces of retrieved context to answer 
-#                     the question. If you don't know the answer, say that you 
-#                     don't know.
-#                     {context}
-#         '''
-
-# prompt = ChatPromptTemplate.from_messages(
-#             [
-#                 ('system',system_prompt),
-#                 ('human','{input}')
-#             ]
-#         )
-# runnable_with_history = RunnableWithMessageHistory(
-#     llm,
-#     get_session_history,
-# )
-
-# qa_chain = create_stuff_documents_chain(llm, prompt)
-# output_parser = StrOutputParser()
-
-# Chain
-# chain = prompt | llm.with_config({"run_name": "model"}) | output_parser.with_config({"run_name": "Assistant"})
 
 class ChatConsumer(AsyncWebsocketConsumer):
     
@@ -87,8 +71,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
         self.chat_history=[]
         self.previous_file_count = 0
         self.conversational_rag_chain = None
+        
         await self.accept()
-
+        
         # Send a message confirming connection
         await self.send(text_data=json.dumps({
             "message": "WebSocket connected."
@@ -105,19 +90,33 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if 'conversation_id' in text_data_json:
             print('CONVERSATION ID IS:',text_data_json['conversation_id'])
             self.conversation_id = text_data_json['conversation_id']
-
-            # Check if the RAG chain is already created and available
-            # print(rag_chain_store[int(self.conversation_id)])
-            if int(self.conversation_id) in rag_chain_store:
-                self.conversational_rag_chain = rag_chain_store[int(self.conversation_id)]
-                print('self.conversational_rag_chain passed to websocket')
-            else:
+            self.chat_history = await load_chat_history_from_db(int(self.conversation_id))
+            print('HISTORY LOADED')
+            try:
+                # Inform the frontend that the RAG chain creation is starting
                 await self.send(text_data=json.dumps({
-                    'message': 'RAG chain not available. Please upload files to create one.',
-                    'sender': 'System'
+                    'event': 'rag_chain_start',
+                    'message': 'Analyzing documents, please wait...'
+                }))
+
+                # Try to create the RAG chain
+                self.conversational_rag_chain = await sync_to_async(create_rag_chain)(self.conversation_id)
+
+                # Inform the frontend that RAG chain creation is complete
+                await self.send(text_data=json.dumps({
+                    'event': 'rag_chain_complete',
+                    'message': 'RAG chain creation complete.'
+                }))
+
+            except Exception as e:
+                # Handle errors and inform the frontend about failure
+                await self.send(text_data=json.dumps({
+                    'event': 'rag_chain_error',
+                    'message': 'Creating RAG chain failed, try uploading another file.'
                 }))
                 return
         else:
+
             # Handle message from the client
             message = text_data_json['message']
             conversation = await self.get_conversation(self.conversation_id)
@@ -143,15 +142,16 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 'sender': self.scope["user"].username
             }))
             print('MESSAGE SENT')
-            
+            file_count = await self.get_uploaded_file_count(self.conversation_id)
             # Send the assistant's response
-            if not self.conversational_rag_chain:
+            if not self.conversational_rag_chain or file_count == 0:
                 await self.send(text_data=json.dumps({
                     'event': 'no_loaded_documents',
                     'message': 'No RAG chain loaded. Please ensure files are uploaded.',
                     'sender': "Assistant"
                 }))
             else:
+                
                 ai_message = ""
                 try:
                     print('trying to send message to llm')
@@ -212,6 +212,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
 
                 except Exception as e:
+                    await self.send(text_data=json.dumps({
+                                'message': 'Reached free rate limit. Chat model not available. Try later',
+                                'sender': "Assistant",
+                                'event': 'limit',
+                            }))
                     print('Response not working',e)
                     print(f"Failed with input message: {message}")
                     print(f"Failed with input message: {ai_message}")
@@ -249,11 +254,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @sync_to_async
     def get_uploaded_file_count(self, conversation_id):
         return UploadedFile.objects.filter(conversation_id=conversation_id).count()
-    
 
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from .models import Conversation, ChatMessage, UploadedFile
+
+
+
 @login_required
 def index(request, conversation_id=None):
     global previous_uploaded_files_counter
@@ -290,7 +294,7 @@ def index(request, conversation_id=None):
             except Exception as e:
                 return render(request, 'langchain_stream/chat.html', {
                         'error_message': f"Error creating RAG chain: {str(e)}",
-                        'messages': messages,
+                        'docs_messages': messages,
                         'conversation': conversation,
                         'conversations': conversations,
                         'uploaded_files': uploaded_files
@@ -301,7 +305,7 @@ def index(request, conversation_id=None):
         # If no uploaded files exist, render without RAG chain creation
         if not uploaded_files.exists():
             return render(request, 'langchain_stream/chat.html', {
-                'messages': messages,
+                'docs_messages': messages,
                 'conversation': conversation,
                 'conversations': conversations,
             })
@@ -314,18 +318,10 @@ def index(request, conversation_id=None):
     # Render the page with the conversations and messages
     return render(request, 'langchain_stream/chat.html', {
         'conversation': conversation, 
-        'messages': messages,
+        'docs_messages': messages,
         'conversations': conversations,
         'uploaded_files': uploaded_files
     })
-
-
-# Helper functions for creating the RAG chain
-def get_session_history(session_id: str) -> BaseChatMessageHistory:
-    """Retrieve or create session history for a conversation."""
-    if session_id not in chatbotmemory:
-        chatbotmemory[session_id] = ChatMessageHistory()  # Initialize history for the session
-    return chatbotmemory[session_id]
     
 
 def load_files_for_conversation(conversation_id):
@@ -362,13 +358,12 @@ def process_files_for_conversation(conversation_id):
 
     return retriever
 
-from langchain.chains import create_history_aware_retriever
+
 def create_rag_chain(conversation_id):
     print('Starting')
     """Create a RAG chain for the conversation."""
     llm = ChatGroq()
     print('llm initialized')
-
 
     ### Contextualize question ###
     contextualize_q_system_prompt = (
@@ -383,57 +378,44 @@ def create_rag_chain(conversation_id):
             ("human", "{input}"),
         ]
     )
-    retriever = process_files_for_conversation(conversation_id)
-    print('retriever created')
+    try:
+        retriever = process_files_for_conversation(conversation_id)
+        print('retriever created')
+        
+        history_aware_retriever = create_history_aware_retriever(
+            llm, retriever, contextualize_q_prompt
+        )
+
+        system_prompt = '''
+                        Given a chat history
+                        You are an assistant for question-answering tasks. 
+                        Use the following pieces of retrieved context to answer 
+                        the question. If you don't know the answer, say that you 
+                        don't know.
+                        {context}
+
+        '''
+        
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", system_prompt),
+                MessagesPlaceholder("chat_history"),
+                ("human", "{input}"),
+            ]
+        )
+
+        qa_chain = create_stuff_documents_chain(llm, prompt)
+        print('qa created')
+        rag_chain = create_retrieval_chain(history_aware_retriever, qa_chain)
+        # rag_chain = create_retrieval_chain(retriever, qa_chain)
+        print('rag_chain created')
+        # print('conversational_rag_chain created')
+        rag_chain_store[conversation_id] = rag_chain
     
-    history_aware_retriever = create_history_aware_retriever(
-        llm, retriever, contextualize_q_prompt
-    )
-    ### Contextualize question ###
-
-
-    system_prompt = '''
-                    Given a chat history
-                    You are an assistant for question-answering tasks. 
-                    Use the following pieces of retrieved context to answer 
-                    the question. If you don't know the answer, say that you 
-                    don't know.
-                    {context}
-
-    '''
-    # prompt = ChatPromptTemplate.from_messages(
-    #     [
-    #         ('system', system_prompt),
-    #         # MessagesPlaceholder("chat_history"),
-    #         ('human', '{input}')
-    #     ]
-    # )
+        return rag_chain
     
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", system_prompt),
-            MessagesPlaceholder("chat_history"),
-            ("human", "{input}"),
-        ]
-    )
-
-    qa_chain = create_stuff_documents_chain(llm, prompt)
-    print('qa created')
-    rag_chain = create_retrieval_chain(history_aware_retriever, qa_chain)
-    # rag_chain = create_retrieval_chain(retriever, qa_chain)
-    print('rag_chain created')
-    conversational_rag_chain = RunnableWithMessageHistory(
-        rag_chain,
-        get_session_history,
-        # input_messages_key="message",
-        # history_messages_key="chat_history",
-        # output_messages_key="answer",
-    )
-    # print('conversational_rag_chain created')
-    rag_chain_store[conversation_id] = rag_chain
-
-
-    return rag_chain
+    except Exception as e:
+        return f'{e}: rate_limit_exceeded'
 
 
 
@@ -458,6 +440,8 @@ def create_rag_chain(conversation_id):
 
 
 
+from django.core.exceptions import ValidationError
+from django.contrib import messages
 
 
 
@@ -477,11 +461,29 @@ def delete_conversation(request, conversation_id):
 @login_required
 def upload_file(request, conversation_id):
     conversation = get_object_or_404(Conversation, id=conversation_id, user=request.user)
+    max_files = 5  # Set the maximum number of files allowed for a conversation
+    uploaded_files_count = UploadedFile.objects.filter(conversation=conversation).count()
+
+    if uploaded_files_count >= max_files:
+        messages.error(request, f"File upload limit reached. You can only upload {max_files} files.")
+        return redirect('langchain_stream:chat', conversation_id=conversation_id)
+
     if request.method == 'POST':
         file = request.FILES.get('file')
+
+        # Validate file type
         if file:
-            UploadedFile.objects.create(user=request.user,conversation=conversation, file=file)
-        return redirect('langchain_stream:chat', conversation_id=conversation_id)
+            valid_extensions = ['.pdf', '.txt']
+            ext = os.path.splitext(file.name)[1].lower()
+            if ext not in valid_extensions:
+                messages.error(request, "Invalid file type. Only .pdf and .txt files are allowed.")
+                return redirect('langchain_stream:chat', conversation_id=conversation_id)
+
+            # Save the file if valid
+            uploaded_file = UploadedFile.objects.create(user=request.user, conversation=conversation, file=file)
+            uploaded_file.save()
+            messages.success(request, "File uploaded successfully.")
+            return redirect('langchain_stream:chat', conversation_id=conversation_id)
     return render(request, 'langchain_stream/chat.html')
 
 
@@ -493,3 +495,10 @@ def download_file(request, file_id):
         return FileResponse(open(file_path, 'rb'), as_attachment=True)
     except UploadedFile.DoesNotExist:
         return HttpResponseBadRequest("File not found.")
+
+
+@login_required
+def delete_file(request, file_id):
+    file = get_object_or_404(UploadedFile, id=file_id, user=request.user)
+    file.delete()  # Delete the file
+    return redirect('langchain_stream:chat', conversation_id=file.conversation.id)

@@ -12,5 +12,6 @@ urlpatterns = [
     path('chat/<int:conversation_id>/delete/', views.delete_conversation, name='delete_conversation'),  # Delete a conversation
     path('upload/<int:conversation_id>/', views.upload_file, name='upload_file'),
     path('download/<int:file_id>/', views.download_file, name='download_file'),
+    path('file/<int:file_id>/delete/', views.delete_file, name='delete_file'),
     
 ]

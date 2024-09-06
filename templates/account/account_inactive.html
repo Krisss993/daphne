@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% load i18n %}
+
+{% block head_title %}{% trans "Account inactive" %}{% endblock %}
+
+{% block content %}
+<div class="site-section" >
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-7">
+                <h1>{% trans "Account inactive" %}</h1>
+                <p>{% trans "This account is inactive." %}</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

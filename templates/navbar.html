@@ -1,0 +1,82 @@
+{% load static %}
+<style>
+    /* Wrapper class to isolate styles */
+    .nav-wrapper {
+        background-color: var(--background-color);
+        color: var(--text-color);
+        width: 100%;
+    }
+
+    /* Flex container to distribute the items equally in one row */
+    .nav-menu {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: space-between; /* Ensure spacing between items */
+        align-items: center; /* Vertically center the items */
+        width: 100%;
+    }
+
+    /* Make each <li> take an equal share of the width */
+    .nav-menu li {
+        flex-grow: 1; /* Ensures equal distribution of width */
+        margin: 0;
+        padding: 0;
+    }
+
+    /* Ensure links take full width/height of the list item */
+    .nav-menu li a {
+        display: block;
+        width: 100%;
+        height: 100%;
+        padding: 15px 0;
+        border-radius: 5px;
+        transition: background-color 0.3s ease, color 0.3s ease;
+        background-color: var(--link-bg-color);
+        color: var(--link-color);
+        text-transform: uppercase;
+        text-decoration: none;
+        text-align: center; /* Center text inside the links */
+    }
+
+    .nav-menu li a:hover {
+        background-color: var(--hover-bg-color);
+        color: var(--text-color);
+    }
+
+    /* Specific button-like styling for the Chat link */
+    .chat-button {
+        background-color: var(--button-bg-color) !important; 
+        color: rgb(252, 255, 206) !important; 
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+
+    .chat-button:hover {
+        background-color: var(--button-hover-bg-color) !important; 
+        color: rgb(250, 175, 175) !important; 
+    }
+
+    /* Remove default margin/padding from <ul> */
+    .container {
+        padding: 0;
+        margin: 0;
+        width: 100%;
+    }
+
+</style>
+
+<nav class="nav-wrapper text-right navbar" role="navigation">
+    <div class="container">
+       <ul class="nav-menu d-md-flex justify-content-right align-items-center">
+           <li><a href="/" class="nav-item"><h2 class="h5 text-black">Home Page</h2></a></li>
+           <li><a href="{% url 'langchain_chat:chat' %}" class="nav-item chat-button"><h2 class="h5">Chat - ALPHA VER.</h2></a></li>
+           <li><a href="{% url 'cart:product-list' %}" class="nav-item"><h2 class="h5 text-black">Store</h2></a></li>
+           <li><a href="{% url 'contact' %}" class="nav-item"><h2 class="h5 text-black">Contact</h2></a></li>
+           {% if request.user.is_staff %}
+               <li><a href="{% url 'staff:staff' %}" class="nav-item"><h2 class="h5 text-black">Staff</h2></a></li>
+           {% endif %}
+       </ul>
+   </div>
+</nav>
