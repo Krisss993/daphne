@@ -1,0 +1,325 @@
+:root {
+    --text-color: rgb(236, 236, 236);
+    --background-color: rgb(33, 33, 33);
+    --input-padding: 10px;
+    --button-padding: 10px 20px;
+    --sidebar-bg-color: #2c2f33;
+    --link-bg-color: #23272a;
+    --hover-bg-color: #7289da;
+    --button-bg-color: #7289da;
+    --button-hover-bg-color: #5b6eab;
+}
+
+/* General body styles */
+body {
+    margin: 0;
+    font-family: Source Sans Pro, sans-serif;
+    font-weight: 400;
+    line-height: 1.6;
+    color: var(--text-color);
+    background-color: var(--background-color);
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+    -webkit-font-smoothing: auto;
+    display: flex;
+    min-width: 320px;
+    min-height: 100vh;
+}
+
+/* Main container using flexbox to position sidebar and chat-container next to each other */
+.container {
+    display: flex;              /* Flexbox layout */
+    height: 100vh;              /* Full height of the viewport */
+    width: 100vw;               /* Full width of the viewport */
+    overflow: hidden;           /* Prevent scrolling the entire container */
+    background-color: rgb(33, 33, 33);
+    flex-direction: row; /* Sidebar and chat-container side-by-side on larger screens */
+}
+
+
+/* Form styling for input at bottom */
+.input-form {
+    position: flex;
+    bottom: 0;
+    left: 0;
+    width: 80%;
+    padding: 0 5rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 -2px 5px #0000001a;
+}
+
+input[type=text] {
+    width: 70%;
+    padding: var(--input-padding);
+}
+
+/* Button styling */
+button {
+    padding: var(--button-padding);
+    border: none;
+    background-color: var(--button-bg-color);
+    color: white;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+}
+
+button:hover {
+    background-color: var(--button-hover-bg-color);
+}
+
+button:focus, button:focus-visible {
+    outline: 4px auto -webkit-focus-ring-color;
+}
+
+
+
+/* Base message styles */
+.message {
+    max-width: 60%;
+    margin-bottom: 10px;
+    padding: 1rem;
+    border-radius: 10px;
+    font-size: 1rem;
+    word-wrap: break-word;
+
+}
+
+
+/* AI message styling (left-aligned) */
+.ai-message {
+    background-color: #f0f0f0;  /* Light gray background for AI */
+    color: #333;
+    align-self: flex-start;     /* Align to the left */
+}
+
+/* User message styling (right-aligned) */
+.user-message {
+    background-color: #7289da;  /* Blue background for user */
+    color: white;
+    align-self: flex-end;       /* Align to the right */
+}
+
+.message strong {
+    margin-bottom: 4px;
+    color: var(--text-color);
+}
+
+.message p {
+    margin: 0;
+}
+
+/* Chat container styling */
+.chat-container {
+    width: 80%;
+    flex-grow: 1;               /* Chat container takes the remaining space */
+    display: flex;
+    flex-direction: column;     /* Flex direction for content */
+    padding: 1rem;
+    box-sizing: border-box;
+    z-index: 1;
+    overflow-y: auto;
+}
+
+/* Messages container */
+.messages-container {
+    flex-grow: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start; /* Align messages to the left by default */
+    padding: 0 5rem;
+    box-sizing: border-box;
+}
+
+/* Sidebar styling */
+.sidebar {
+    width: 300px; 
+    background-color: #2c2f33;
+    padding: 1rem;
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+    overflow-y: auto;           /* Make sidebar scrollable if content overflows */
+    z-index: 2;                 /* Sidebar stays above other elements */
+    transition: transform 0.3s ease; /* Smooth transition for folding/unfolding */
+}
+
+.sidebar h2 {
+    color: #ffffff;
+    margin-bottom: 1rem;
+}
+
+.sidebar ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+.sidebar li {
+    display: flex;
+    justify-content: space-between;  /* Space between the link and the delete button */
+    align-items: center;             /* Vertically center the items */
+    margin-bottom: 10px;
+}
+
+.sidebar a {
+    color: #ffffff;
+    text-decoration: none;
+    padding: 10px;
+    display: block;
+    background-color: var(--link-bg-color);
+    border-radius: 5px;
+    flex-grow: 1; /* Ensure link takes full width */
+    margin-right: 10px;
+    transition: background-color 0.3s ease;
+    white-space: nowrap;  /* Prevent wrapping */
+    overflow: hidden;     /* Hide overflow */
+    text-overflow: ellipsis;  /* Display ellipsis for overflow */
+}
+
+.sidebar a:hover, .sidebar a.active {
+    background-color: var(--hover-bg-color);
+}
+
+/* Delete button inside sidebar list */
+.sidebar .delete-btn {
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+    border-radius: 5px;
+    z-index: 2;  /* Ensure the delete button is on top */
+}
+
+.sidebar .delete-btn:hover {
+    background-color: #c0392b;
+}
+
+
+/* Media Query for Smaller Screens (Mobile) */
+@media (max-width: 768px) {
+    .container {
+        flex-direction: column; /* Stack the sidebar on top of the chat-container */
+    }
+
+    /* Hide sidebar initially */
+    .sidebar {
+        width: 100%;              /* Full width on mobile */
+        max-height: 0;             /* Hidden by default (collapsed) */
+        overflow: hidden;          /* Prevent content from being visible */
+        transform: translateY(-100%); /* Sidebar hidden by default (folded up) */
+    }
+
+    /* Sidebar expanded state */
+    .sidebar.expanded {
+        min-height: 150px;
+        max-height: 600px;         /* Expand sidebar to 500px when unfolded */
+        transform: translateY(0);  /* Sidebar visible when unfolded */
+        overflow-y: scroll;        /* Enable scrolling if content overflows */
+    }
+
+    .chat-container {
+        height: 70%;
+        width: 100%;
+        flex-grow: 1;
+        padding: 1rem;
+    }
+
+    .input-form {
+        width: 100%;
+        padding: 10px;
+    }
+
+    input[type="text"] {
+        width: 100%;  /* Full width input on mobile */
+        margin-right: 0;
+    }
+
+    /* Toggle button */
+    .toggle-sidebar-btn {
+        display: block;
+        width: 100%;
+        background-color: #7289da;
+        color: white;
+        border: none;
+        padding: 10px;
+        cursor: pointer;
+        text-align: center;
+        margin-bottom: 10px;
+        z-index: 4; /* Ensure the button is on top of other elements */
+    }
+
+    .toggle-sidebar-btn:hover {
+        background-color: #5b6eab;
+    }
+}
+
+/* Hide the toggle button on larger screens */
+@media (min-width: 769px) {
+    .toggle-sidebar-btn {
+        display: none;  /* Button hidden on wider screens */
+    }
+
+    .sidebar {
+        max-height: none; /* Ensure the sidebar is always visible on larger screens */
+        transform: translateY(0); /* No transformation needed on large screens */
+    }
+}
+
+
+/* Add basic CSS to style the loading popup */
+.loading-popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 20px;
+    border-radius: 8px;
+    z-index: 1000;
+    text-align: center;
+}
+
+.alert-box {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    width: 80%;
+    max-width: 600px;
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.alert-message {
+    padding: 10px;
+    margin: 5px 0;
+    list-style: none;
+    font-size: 16px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.alert-message.success {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.alert-message.error {
+    background-color: #f44336;
+    color: white;
+}
+
+.alert-message.info {
+    background-color: #2196F3;
+    color: white;
+}
+
+.alert-message.warning {
+    background-color: #ff9800;
+    color: white;
+}
