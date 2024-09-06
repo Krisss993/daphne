@@ -228,9 +228,9 @@ python-magic==0.4.27
 python-magic-bin==0.4.14; platform_system == "Windows"
 python-multipart==0.0.9
 pytweening==1.0.7
-pywin32==306
-pywin32-ctypes==0.2.2
-pywinpty==2.0.13
+pywin32==306; platform_system == "Windows"
+pywin32-ctypes==0.2.2; platform_system == "Windows"
+pywinpty==2.0.13; platform_system == "Windows"
 PyYAML==6.0.2
 pyzmq==26.0.3
 qtconsole==5.5.2
