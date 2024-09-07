@@ -19,7 +19,7 @@ def main():
 
     # Get the PORT environment variable
     port = os.environ.get('PORT', '8000')
-    execute_from_command_line([sys.argv[0], 'runserver', '0.0.0.0:' + port])
+    execute_from_command_line([sys.argv[0], 'runserver', f'0.0.0.0:{port}'])
 
 if __name__ == '__main__':
     main()
