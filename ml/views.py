@@ -1,6 +1,4 @@
 from django.shortcuts import render
-from nbconvert import HTMLExporter
-import nbformat
 import os
 from django.http import HttpResponse
 
