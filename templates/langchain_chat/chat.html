@@ -42,6 +42,7 @@
             </div>
         
             <form id="input-form" class="input-form">
+                {% csrf_token %}
                 <input type="text" id="message-input" placeholder="Type your message here..."/>
                 <button type="submit">Send</button>
             </form>

@@ -15,9 +15,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = None
 
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'ml-chat.onrender.com']
+
+CSRF_TRUSTED_ORIGINS = ['https://ml-chat.onrender.com']
 
 CORS_ALLOW_ALL_ORIGINS = True
 
@@ -76,6 +78,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'allauth.account.middleware.AccountMiddleware',
+    'django.middleware.http.ConditionalGetMiddleware',
 ]
 
 
@@ -100,6 +103,15 @@ TEMPLATES = [
 # WSGI_APPLICATION = 'Django_React_Langchain_Stream.wsgi.application'
 ASGI_APPLICATION = "Django_React_Langchain_Stream.asgi.application"
 
+
+
+
+
+
+
+
+
+
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
@@ -118,6 +130,16 @@ DATABASES = {
 # DATABASES = {
 #     'default': dj_database_url.config(default=f"postgresql://{os.environ.get('DATABASE_USER')}:{os.environ.get('DATABASE_PASSWORD')}@{os.environ.get('DATABASE_HOST')}:{os.environ.get('DATABASE_PORT')}/{os.environ.get('DATABASE_NAME')}")
 # }
+
+
+
+
+
+
+
+
+
+
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
 
@@ -206,3 +228,6 @@ CRISPY_TEMPLATE_PACK = 'bootstrap4'
 # PAYPAL_CLIENT_ID = env('PAYPAL_SANDBOX_CLIENT_ID')
 # PAYPAL_SECRET_KEY = env('PAYPAL_SANDBOX_SECRET_KEY')
 # SECURE_CROSS_ORIGIN_OPENER_POLICY='same-origin-allow-popups'
+
+
+USE_X_FORWARDED_HOST = True
