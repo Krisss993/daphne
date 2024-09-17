@@ -145,6 +145,7 @@ uvicorn==0.30.6
 watchfiles==0.24.0
 websocket-client==1.8.0
 websockets==13.0.1
+whitenoise==6.7.0
 wrapt==1.16.0
 yarl==1.10.0
 zipp==3.20.1
