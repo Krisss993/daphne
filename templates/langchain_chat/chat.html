@@ -156,46 +156,52 @@
 
             // ws.onmessage = function(event) {
             //     const data = JSON.parse(event.data);
-            //     const sender = data.name;
-            //     console.log("Message from server:", data.name);
+            //     const sender = data.sender || "Assistant"; 
+            //     const message = data.message || "";
+            //     console.log("Message from server:", data.message);
                 
-            //     if (data.event === 'on_parser_start') {
+            //     if (data.event === 'on_chat_model_start') {
+            //         // When the AI message starts, reset the ongoing stream content
             //         ongoingStream = { id: data.run_id, content: '' };
             //         responses.push({ sender: sender, message: '', id: data.run_id });
             //         renderMessages();
             //     } else if (data.event === 'on_chat_model_stream' && ongoingStream && data.run_id === ongoingStream.id) {
-            //         responses = responses.map(msg => msg.id === data.run_id ? { ...msg, message: msg.message + data.data.chunk } : msg);
+            //         // Append chunks of AI message to the ongoing stream content
+            //         ongoingStream.content += data.message;
+            //         responses = responses.map(msg => msg.id === data.run_id ? { ...msg, message: ongoingStream.content } : msg);
             //         renderMessages();
             //     }
             // };
+
             ws.onmessage = function(event) {
                 const data = JSON.parse(event.data);
                 const sender = data.sender || "Assistant"; 
-                const message =  data.message || "";
-                console.log("Message from server:", data.message);
+                const message = data.message || "";
                 
+                console.log("Message from server:", data.message);
+                console.log("Received event:", data.event);
+                console.log("Ongoing AI message:", ongoingStream);
                 if (data.event === 'on_chat_model_start') {
+                    // Reset the ongoingStream and push a new message placeholder into the responses array
                     ongoingStream = { id: data.run_id, content: '' };
                     responses.push({ sender: sender, message: '', id: data.run_id });
-                    renderMessages();
+                    renderMessages();  // Render the placeholder message immediately
                 } else if (data.event === 'on_chat_model_stream' && ongoingStream && data.run_id === ongoingStream.id) {
-                    responses = responses.map(msg => msg.id === data.run_id ? { ...msg, message: msg.message + data.message } : msg);
+                    // Append chunks to the ongoing stream content
+                    ongoingStream.content += data.message;
+                    
+                    // Update the message content in the responses array by matching run_id
+                    responses = responses.map(msg => {
+                        if (msg.id === data.run_id) {
+                            return { ...msg, message: ongoingStream.content };  // Append new content to the message
+                        }
+                        return msg;
+                    });
+
+                    // Re-render the updated messages
                     renderMessages();
                 }
             };
-
-        //     ws.onmessage = function(event) {
-        //     const data = JSON.parse(event.data);
-        //     const message = data.message;
-        //     const sender = data.sender || "Assistant";  // Default to "Assistant" if sender is not provided
-
-        //     console.log("Message from server:", data);
-
-        //     if (message) {
-        //         responses.push({ sender: sender, message: message });
-        //         renderMessages();  // Immediately update the chat interface
-        //     }
-        // };
 
 
 

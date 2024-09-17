@@ -1,39 +1,27 @@
-from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-
 import json
 from dotenv import load_dotenv
 
 from channels.generic.websocket import AsyncWebsocketConsumer
 from asgiref.sync import sync_to_async
 
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-from langchain_chat.models import Conversation, ChatMessage
-from django.http import JsonResponse, HttpResponseBadRequest
-from django.http import FileResponse
-from langchain_community.document_loaders import TextLoader
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_chroma import Chroma
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import TextLoader
+
+from langchain_groq import ChatGroq
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder, HumanMessagePromptTemplate
-from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain.chains import create_history_aware_retriever
+from langchain_chat.models import Conversation, ChatMessage
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.runnables import RunnableWithMessageHistory
 from langchain_core.chat_history import BaseChatMessageHistory
-from langchain.chains import create_retrieval_chain
-import os
-from django.conf import settings
-from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.runnables import RunnablePassthrough
+
 
 load_dotenv('.env')
+
 
 chatbotmemory={}
 
@@ -42,27 +30,26 @@ def get_session_history(session_id: str) -> BaseChatMessageHistory:
         chatbotmemory[session_id] = ChatMessageHistory()
     return chatbotmemory[session_id]    
 
-
 llm = ChatGroq(model="llama-3.1-70b-versatile")
 
 prompt = ChatPromptTemplate.from_messages([
     ("system", "You are a helpful assistant."),
        MessagesPlaceholder(variable_name='message')
+
 ])
 
-
-output_parser = StrOutputParser()
+chain = prompt | llm
 
 runnable_with_history = RunnableWithMessageHistory(
-    llm,
+    chain,
     get_session_history,
-
 )
 
 
 class ChatConsumer(AsyncWebsocketConsumer):
     
     async def connect(self):
+        self.run_id=0
         await self.accept()
 
         # Send a message confirming connection
@@ -70,8 +57,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
             "message": "WebSocket connected."
         }))
 
+
     async def disconnect(self, close_code):
         pass
+
 
     async def receive(self, text_data):
         # Parse the incoming message
@@ -82,9 +71,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self.conversation_id = text_data_json['conversation_id']
         else:
             message = text_data_json['message']
-            print(message)
             conversation = await self.get_conversation(self.conversation_id)
-
             # Save the user's message to the database
             await self.save_message(conversation, self.scope["user"].username, message, is_user=True, is_ai=False)
             print('MESSAGE SAVED')
@@ -105,26 +92,34 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
             ai_message = ""
             try:
+                print('RESPONSE LOOP STARTED')
+                print(f'SELF RUN ID: {self.run_id}')
+                self.run_id += 1
+
                 # Stream the response from the chatbot
                 async for chunk in runnable_with_history.astream_events(
-                        {'message': [HumanMessage(content=message)]},
+                        {
+                            'message': [HumanMessage(content=message)],
+                         },
                         config=session_config,
                         version="v2"):
 
                     kind = chunk["event"]
+
                     if kind == "on_chat_model_start":
                         await self.send(text_data=json.dumps({
-                            'run_id': 2,
+                            'run_id': self.run_id,
                             'sender': 'Assistant',
                             'event': 'on_chat_model_start',
                         }))
+
                     elif kind == "on_chat_model_stream":
                         ai_message += chunk['data']['chunk'].content
                         await self.send(text_data=json.dumps({
                             'message': chunk['data']['chunk'].content,
                             'sender': 'Assistant',
                             'event': 'on_chat_model_stream',
-                            'run_id': 2
+                            'run_id': self.run_id,
                         }))
 
                 # Save the full AI message to the database
@@ -134,15 +129,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         'message': ai_message,
                         'sender': "Assistant"
                     }))
-                    print('MESSAGE SENT TO WEBSOCKET', json.dumps({
-                        'message': ai_message,
-                        'sender': "Assistant"
-                    }))
+                    print(f'MESSAGE SENT TO WEBSOCKET: {ai_message}')
 
             except Exception as e:
-                print('Response not working', e)
-                print(f"Failed with input message: {message}")
-                print(f"Failed with input message: {ai_message}")
+                print(f"Response not working: {e}")
+                print(f"Failed with user input message: {message}")
+                print(f"Failed with AI input message: {ai_message}")
+
 
     async def chat_message(self, event):
         message = event['message']
@@ -154,9 +147,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'sender': sender
         }))
 
+
     @sync_to_async
     def get_conversation(self, conversation_id):
         return Conversation.objects.get(pk=conversation_id)
+
 
     @sync_to_async
     def save_message(self, conversation, sender, message, is_user, is_ai):
@@ -168,13 +163,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
             is_ai_message=is_ai
         )
 
-from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required
-
 
 @login_required
 def index(request, conversation_id=None):
-
     # Get all conversations created by the user
     conversations = Conversation.objects.filter(user=request.user).order_by('-created_at')
     # If a conversation ID is provided, get the conversation, otherwise create a new one
@@ -184,6 +175,17 @@ def index(request, conversation_id=None):
         # Get the specific conversation and its messages
         conversation = get_object_or_404(Conversation, id=conversation_id, user=request.user)
         messages = ChatMessage.objects.filter(conversation_id=conversation_id).order_by('timestamp')
+
+        # Initialize ChatMessageHistory for this conversation and populate it with messages
+        chat_history = ChatMessageHistory()
+        for message in messages:
+            if message.is_user_message:
+                chat_history.add_user_message(HumanMessage(content=message.message))
+            elif message.is_ai_message:
+                chat_history.add_ai_message(AIMessage(content=message.message))
+
+        # Store chat history in chatbotmemory
+        chatbotmemory[str(conversation_id)] = chat_history
     else:
         # Create a new conversation if no conversation ID is provided
         conversation = Conversation.objects.create(user=request.user)
@@ -197,12 +199,6 @@ def index(request, conversation_id=None):
         })
 
 
-
-
-
-
-
-
 @login_required
 def conversation_list(request):
     conversations = Conversation.objects.filter(user=request.user).order_by('-created_at')
@@ -212,5 +208,5 @@ def conversation_list(request):
 @login_required
 def delete_conversation(request, conversation_id):
     conversation = get_object_or_404(Conversation, id=conversation_id, user=request.user)
-    conversation.delete()  # Delete the conversation
-    return redirect('langchain_chat:conversation_list')  # Redirect to a new chat after deletion
+    conversation.delete()
+    return redirect('langchain_chat:conversation_list')

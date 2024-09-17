@@ -1,55 +1,43 @@
-from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-
+import os
 import json
-from dotenv import load_dotenv
 
+from dotenv import load_dotenv
 from channels.generic.websocket import AsyncWebsocketConsumer
 from asgiref.sync import sync_to_async
 
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse, HttpResponseBadRequest
+from django.http import HttpResponseBadRequest
 from django.http import FileResponse
+from django.conf import settings
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+
+from langchain_groq import ChatGroq
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_community.document_loaders import TextLoader
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import TextLoader
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder, HumanMessagePromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_history_aware_retriever
-from langchain_community.chat_message_histories import ChatMessageHistory
-from langchain_core.runnables import RunnableWithMessageHistory
-from langchain_core.chat_history import BaseChatMessageHistory
 from langchain.chains import create_retrieval_chain
-import os
-from django.conf import settings
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.runnables import RunnablePassthrough
-from langchain_community.vectorstores import Qdrant
 from langchain.chains.combine_documents import create_stuff_documents_chain
-load_dotenv('.env')
 from langchain.chains import create_history_aware_retriever
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
 from langchain_stream.models import Conversation, ChatMessage, UploadedFile
-from channels.generic.websocket import AsyncWebsocketConsumer
-from asgiref.sync import sync_to_async
-import json
-import os
-from langchain_community.vectorstores import Qdrant
 from langchain.embeddings import HuggingFaceEmbeddings
-from django.conf import settings
 
+
+load_dotenv('.env')
 
 rag_chain_store = {}
 previous_uploaded_files_counter = 0
-
 
 @sync_to_async
 def load_chat_history_from_db(conversation_id: int):
@@ -66,6 +54,7 @@ def load_chat_history_from_db(conversation_id: int):
 
 class ChatConsumer(AsyncWebsocketConsumer):
     
+
     async def connect(self):
         self.run_id=0
         self.chat_history=[]
@@ -79,8 +68,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
             "message": "WebSocket connected."
         }))
 
+
     async def disconnect(self, close_code):
         pass
+
 
     async def receive(self, text_data):
         # Parse the incoming message
@@ -120,19 +111,15 @@ class ChatConsumer(AsyncWebsocketConsumer):
             # Handle message from the client
             message = text_data_json['message']
             conversation = await self.get_conversation(self.conversation_id)
-            # self.runnable_with_history = RunnableWithMessageHistory(
-            #     self.conversational_rag_chain,
-            #     get_session_history,
-            # )
+
             # Save the message to the database asynchronously
             await self.save_message(conversation, self.scope["user"].username, message, is_user=True, is_ai=False)
-            # self.chat_history=[]
             print('MESSAGE SAVED')
             # Prepare input for the chatbot
             session_config = {
                 'configurable': {
-                'session_id': str(self.conversation_id),  # Use conversation_id as session_id
-                # 'name': conversation.title           # Use the conversation title as the name
+                'session_id': str(self.conversation_id),
+
                 }
             }
             
@@ -151,20 +138,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     'sender': "Assistant"
                 }))
             else:
-                
+                response_completed = False
+                chunk_counter = 0
+                max_chunks = 5
                 ai_message = ""
                 try:
                     print('trying to send message to llm')
                     # Stream the response
-                    self.run_id+=1
                     async for event in self.conversational_rag_chain.astream_events(
                             {
                                 'input':message,
                                 "chat_history": self.chat_history,
                             }, 
                             config=session_config, version="v1"):
-                        if event["event"] == "on_chat_model_start":
-                            
+                        if event["event"] == "on_chat_model_start" and not response_completed:
+                            self.run_id+=1
                             print(self.run_id)
                             await self.send(text_data=json.dumps({
                             'run_id': self.run_id,
@@ -172,14 +160,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
                             'event': 'on_chat_model_start',
 
                             }))
-                            
+                            response_completed = True
+
                         elif (
                                     event["event"] == "on_chat_model_stream"
                                 ):  
-                            ai_message_chunk = event["data"]["chunk"]
-                            # print(f"{ai_message_chunk.content}", end="")
-                            ai_message += event['data']['chunk'].content  # Append each chunk to ai_message
-                            #print(event['data']['chunk'].id)
+                            chunk = event['data']['chunk'].content
+                            ai_message += event['data']['chunk'].content 
+                            
+                            chunk_counter += chunk.count('.')
+                            if chunk_counter >= max_chunks:
+                                break
                                 # Send the chunk to the WebSocket with proper structure
                             await self.send(text_data=json.dumps({
                                 'message': event['data']['chunk'].content,
@@ -188,9 +179,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                                 'run_id': self.run_id
 
                             }))
-
-                    
-                            # print(json.dumps(chunk['data']['chunk'].content))
+                            
                     # After the full response is accumulated, save the AI message to the database
                     if ai_message:
                         await self.save_message(conversation, "Assistant", ai_message, is_user=False, is_ai=True)
@@ -210,7 +199,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
                                 'sender': "Assistant"
                             }))
 
-
                 except Exception as e:
                     await self.send(text_data=json.dumps({
                                 'message': 'Reached free rate limit. Chat model not available. Try later',
@@ -220,6 +208,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     print('Response not working',e)
                     print(f"Failed with input message: {message}")
                     print(f"Failed with input message: {ai_message}")
+
 
     # Send messages to the WebSocket client
     async def chat_message(self, event):
@@ -232,9 +221,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'sender': sender
         }))
 
+
     @sync_to_async
     def get_conversation(self, conversation_id):
         return Conversation.objects.get(pk=conversation_id)
+
 
     @sync_to_async
     def save_message(self, conversation, sender, message, is_user, is_ai):
@@ -246,6 +237,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             is_ai_message=is_ai
         )
 
+
     @sync_to_async
     def get_uploaded_files(self, conversation_id):
         return list(UploadedFile.objects.filter(conversation_id=conversation_id))
@@ -254,8 +246,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
     @sync_to_async
     def get_uploaded_file_count(self, conversation_id):
         return UploadedFile.objects.filter(conversation_id=conversation_id).count()
-
-
 
 
 @login_required
@@ -328,7 +318,7 @@ def load_files_for_conversation(conversation_id):
     """Load all files associated with the conversation."""
     uploaded_files = UploadedFile.objects.filter(conversation__id=conversation_id)
     docs = []
-    for file in uploaded_files:
+    for file in uploaded_files[:3]:
         file_path = os.path.join(settings.MEDIA_ROOT, file.file.name)
         file_extension = os.path.splitext(file.file.name)[1].lower()
         if file_extension == '.pdf':
@@ -341,6 +331,7 @@ def load_files_for_conversation(conversation_id):
             print('Not supported file format')
             continue
         docs.extend(loader.load())  # Load and add the document content
+    print(len(docs))
     return docs
 
 
@@ -369,7 +360,7 @@ def create_rag_chain(conversation_id):
     contextualize_q_system_prompt = (
         "Given a chat history and the latest user question "
         "which might reference context in the chat history, "
-        "answer the questions"
+        "answer the questions  in a maximum of 5 sentences."
     )
     contextualize_q_prompt = ChatPromptTemplate.from_messages(
         [
@@ -392,6 +383,7 @@ def create_rag_chain(conversation_id):
                         Use the following pieces of retrieved context to answer 
                         the question. If you don't know the answer, say that you 
                         don't know.
+                        Answer in a maximum of 5 sentences.
                         {context}
 
         '''
@@ -407,42 +399,15 @@ def create_rag_chain(conversation_id):
         qa_chain = create_stuff_documents_chain(llm, prompt)
         print('qa created')
         rag_chain = create_retrieval_chain(history_aware_retriever, qa_chain)
-        # rag_chain = create_retrieval_chain(retriever, qa_chain)
+
         print('rag_chain created')
-        # print('conversational_rag_chain created')
+
         rag_chain_store[conversation_id] = rag_chain
     
         return rag_chain
     
     except Exception as e:
         return f'{e}: rate_limit_exceeded'
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-from django.core.exceptions import ValidationError
-from django.contrib import messages
-
 
 
 @login_required
@@ -454,14 +419,14 @@ def conversation_list(request):
 @login_required
 def delete_conversation(request, conversation_id):
     conversation = get_object_or_404(Conversation, id=conversation_id, user=request.user)
-    conversation.delete()  # Delete the conversation
-    return redirect('langchain_stream:conversation_list')  # Redirect to a new chat after deletion
+    conversation.delete() 
+    return redirect('langchain_stream:conversation_list')
 
 
 @login_required
 def upload_file(request, conversation_id):
     conversation = get_object_or_404(Conversation, id=conversation_id, user=request.user)
-    max_files = 5  # Set the maximum number of files allowed for a conversation
+    max_files = 5 
     uploaded_files_count = UploadedFile.objects.filter(conversation=conversation).count()
 
     if uploaded_files_count >= max_files:
@@ -500,5 +465,5 @@ def download_file(request, file_id):
 @login_required
 def delete_file(request, file_id):
     file = get_object_or_404(UploadedFile, id=file_id, user=request.user)
-    file.delete()  # Delete the file
+    file.delete()
     return redirect('langchain_stream:chat', conversation_id=file.conversation.id)
