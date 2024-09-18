@@ -15,7 +15,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'ml-chat.onrender.com']
 
@@ -197,18 +197,18 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = '/accounts/login/'
 
 
-if DEBUG is False:
-   SESSION_COOKIE_SECURE = True
-   SECURE_BROWSER_XSS_FILTER = True
-   SECURE_CONTENT_TYPE_NOSNIFF = True
-   SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-   SECURE_HSTS_SECONDS = 31536000
-   SECURE_REDIRECT_EXEMPT = []
-   SECURE_SSL_REDIRECT = True
-   SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDER_PROTO', 'https')
+# if DEBUG is False:
+#    SESSION_COOKIE_SECURE = True
+#    SECURE_BROWSER_XSS_FILTER = True
+#    SECURE_CONTENT_TYPE_NOSNIFF = True
+#    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+#    SECURE_HSTS_SECONDS = 31536000
+#    SECURE_REDIRECT_EXEMPT = []
+#    SECURE_SSL_REDIRECT = True
+#    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDER_PROTO', 'https')
 
-   ALLOWED_HOSTS = ['www.domain.com']
-   EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+#    ALLOWED_HOSTS = ['www.domain.com']
+#    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
