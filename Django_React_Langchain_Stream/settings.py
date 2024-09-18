@@ -15,7 +15,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'ml-chat.onrender.com']
 
@@ -210,16 +210,6 @@ if DEBUG is False:
    ALLOWED_HOSTS = ['www.domain.com']
    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 
-   DATABASES = {
-       'default': {
-           'ENGINE': 'django.db.backends.postgresql_psycopg2',
-           'NAME': '',
-           'USER': '',
-           'PASSWORD': '',
-           'HOST': '',
-           'PORT': '',
-   }
-   }
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
 
